@@ -1,0 +1,185 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import './svelte-forms.css';
+
+@source '../../node_modules/components';
+@source '../../node_modules/lp-wizard';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  /* Radius (for rounded-*) */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* Colors */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-ring: var(--ring);
+  --color-radius: var(--radius);
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-border, currentcolor);
+  }
+}
+
+:root {
+  --background: hsl(0 0% 100%);
+  --foreground: hsl(20 14.3% 4.1%);
+
+  --muted: hsl(60 4.8% 95.9%);
+  --muted-foreground: hsl(25 5.3% 44.7%);
+
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(20 14.3% 4.1%);
+
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(20 14.3% 4.1%);
+
+  --border: hsl(20 5.9% 90%);
+  --input: hsl(20 5.9% 90%);
+
+  --primary: hsl(24 9.8% 10%);
+  --primary-foreground: hsl(60 9.1% 97.8%);
+
+  --secondary: hsl(60 4.8% 95.9%);
+  --secondary-foreground: hsl(24 9.8% 10%);
+
+  --accent: hsl(60 4.8% 95.9%);
+  --accent-foreground: hsl(24 9.8% 10%);
+
+  --destructive: hsl(0 72.2% 50.6%);
+  --destructive-foreground: hsl(60 9.1% 97.8%);
+
+  --ring: hsl(20 14.3% 4.1%);
+
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: hsl(20 14.3% 4.1%);
+  --foreground: hsl(60 9.1% 97.8%);
+
+  --muted: hsl(12 6.5% 15.1%);
+  --muted-foreground: hsl(24 5.4% 63.9%);
+
+  --popover: hsl(20 14.3% 4.1%);
+  --popover-foreground: hsl(60 9.1% 97.8%);
+
+  --card: hsl(20 14.3% 4.1%);
+  --card-foreground: hsl(60 9.1% 97.8%);
+
+  --border: hsl(12 6.5% 15.1%);
+  --input: hsl(12 6.5% 15.1%);
+
+  --primary: hsl(60 9.1% 97.8%);
+  --primary-foreground: hsl(24 9.8% 10%);
+
+  --secondary: hsl(12 6.5% 15.1%);
+  --secondary-foreground: hsl(60 9.1% 97.8%);
+
+  --accent: hsl(12 6.5% 15.1%);
+  --accent-foreground: hsl(60 9.1% 97.8%);
+
+  --destructive: hsl(0 62.8% 30.6%);
+  --destructive-foreground: hsl(60 9.1% 97.8%);
+
+  --ring: hsl(24 5.7% 82.9%);
+}
+
+@layer base {
+  * {
+    @apply border-input!;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  input[data-slot='command-input'] {
+    border: none !important;
+  }
+
+  input[data-slot='input']:focus,
+  input[data-slot='input']:focus-visible {
+    outline: none !important;
+    box-shadow: 0 0 0 1px hsl(0 0% 0% / 0.08) !important;
+    border-radius: 0.25rem;
+  }
+  textarea {
+    outline: none;
+    border: 1px solid hsl(0 0% 0% / 0.08);
+    border-radius: 0.25rem !important;
+  }
+  textarea:focus,
+  textarea:focus-visible {
+    outline: 2px solid hsl(0 0% 0% / 0.08) !important;
+    outline-offset: -1px !important;
+    border-radius: 0.25rem !important;
+  }
+}
+
+/* animate tabs */
+@supports (anchor-name: --test) {
+  [data-slot='tabs-list'] {
+    position: relative;
+  }
+  [data-slot='tabs-list'] {
+    anchor-scope: --active-tab;
+  }
+  [data-slot='tabs-list'] [data-slot='tabs-trigger'] {
+    @apply relative z-20;
+  }
+  [data-slot='tabs-list'] [data-slot='tabs-trigger'][data-state='active'] {
+    anchor-name: --active-tab;
+    @apply bg-transparent shadow-none;
+  }
+  [data-slot='tabs-list']::before {
+    content: '';
+    @apply absolute z-10 rounded-md bg-background shadow;
+    left: anchor(--active-tab left);
+    right: anchor(--active-tab right);
+    top: anchor(--active-tab top);
+    bottom: anchor(--active-tab bottom);
+    width: anchor-size(--active-tab width);
+    height: anchor-size(--active-tab height);
+    transition:
+      left 260ms cubic-bezier(0.2, 0.7, 0, 1),
+      right 260ms cubic-bezier(0.2, 0.7, 0, 1),
+      top 260ms cubic-bezier(0.2, 0.7, 0, 1),
+      bottom 260ms cubic-bezier(0.2, 0.7, 0, 1),
+      width 260ms cubic-bezier(0.2, 0.7, 0, 1),
+      height 260ms cubic-bezier(0.2, 0.7, 0, 1);
+  }
+}

@@ -1,0 +1,209 @@
+@font-face {
+  font-family: Noto;
+  src: url(https://notofonts.github.io/arabic/fonts/NotoNaskhArabic/unhinted/variable-ttf/NotoNaskhArabic[wght].ttf);
+  font-display: swap;
+  unicode-range:
+    U+200?, U+60C, U+618-61B, U+61F, U+621-63A, U+640-655, U+65C, U+660-66C, U+670-671, U+6CC,
+    U+6D4, U+6D6-6DD, U+6DF-6E8, U+6EA-6ED, U+8F0-8F3, U+FD3E-FD3F, U+FDF2;
+}
+@font-face {
+  font-family: Kitab;
+  src: url(https://fonts.nuqayah.com/kitab-base.woff2?v4);
+  font-display: swap;
+  unicode-range:
+    U+200?, U+60C, U+618-61B, U+61F, U+621-63A, U+640-655, U+65C, U+660-66C, U+670-671, U+6CC,
+    U+6D4, U+6D6-6DD, U+6DF-6E8, U+6EA-6ED, U+8F0-8F3, U+FD3E-FD3F, U+FDF2;
+}
+@font-face {
+  font-family: Kitab;
+  src: url(https://fonts.nuqayah.com/kitab-base-b.woff2?v4);
+  font-weight: 700;
+  font-display: swap;
+  unicode-range:
+    U+200?, U+60C, U+618-61B, U+61F, U+621-63A, U+640-655, U+65C, U+660-66C, U+670-671, U+6CC,
+    U+6D4, U+6D6-6DD, U+6DF-6E8, U+6EA-6ED, U+8F0-8F3, U+FD3E-FD3F, U+FDF2;
+}
+@font-face {
+  font-family: Kitab;
+  src: url(https://fonts.nuqayah.com/kitab-phrases.woff2?v4);
+  font-display: swap;
+  unicode-range: U+6DE, U+6E9, U+E100-E103, U+FD3E-FD45, U+FD47-FD4F, U+FDFA-FDFB, U+FDFD-FDFF;
+}
+@font-face {
+  font-family: Kitab;
+  src: url(https://fonts.nuqayah.com/kitab-phrases.woff2?v4);
+  font-weight: 700;
+  font-display: swap;
+  unicode-range: U+6DE, U+6E9, U+E100-E103, U+FD3E-FD45, U+FD47-FD4F, U+FDFA-FDFB, U+FDFD-FDFF;
+}
+
+:root {
+  --dark-blue: #216693;
+  --light-blue: #2995dc;
+}
+
+html {
+  font-size: 22px;
+  line-height: 1.55;
+  font-family: system-ui, Noto, Kitab, sans-serif;
+}
+@media (max-width: 992px) {
+  html {
+    font-size: 21px;
+  }
+}
+@media (max-width: 768px) {
+  html {
+    font-size: 18.5px;
+  }
+}
+@media (max-width: 576px) {
+  html {
+    font-size: 17px;
+  }
+}
+
+body {
+  overscroll-behavior-y: contain;
+}
+body > main {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+@media (max-width: 768px) {
+  body > main {
+    padding: 0 0.75rem;
+  }
+}
+@media (max-width: 576px) {
+  body > main {
+    padding: 0 0.5rem;
+  }
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.icon {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+  vertical-align: middle;
+  color: inherit;
+  pointer-events: none;
+}
+
+/* Full height */
+.full-height {
+  height: calc(100vh - var(--top-offset, 0px));
+  overflow: auto;
+}
+
+/* Search cont */
+.search-input-cont {
+  max-width: 23rem;
+  margin: 0 auto;
+  font-size: 0.9rem;
+  border: 1px solid #aaa;
+  transition:
+    border-color ease-in-out 0.15s,
+    box-shadow ease-in-out 0.15s;
+  border-radius: 4px;
+  background: white;
+}
+.search-input {
+  display: block;
+  width: 100%;
+  margin: 0;
+  border: 0;
+  border-radius: 4px;
+  box-shadow: none;
+  outline: none; /*todo*/
+}
+
+.ellipses {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+h3:not(:first-of-type) {
+  margin-top: 1rem;
+}
+p:not(:first-of-type) {
+  margin-top: 1rem;
+}
+
+.no-results {
+  text-align: center;
+  font-size: 1.5rem;
+  color: #999;
+}
+
+mark {
+  color: red;
+  font-weight: bold;
+  background: none;
+}
+
+.has-tip {
+  padding-bottom: 3px;
+  border-bottom: 1px dashed #aaa;
+}
+
+@font-face {
+  font-family: NoName;
+  src: url(https://raw.githubusercontent.com/alif-type/noname-fixed/main/NoNameFixed-Regular.otf);
+}
+.noname {
+  font-family: noname;
+}
+.noname span {
+  display: inline-block;
+}
+
+ol[data-sonner-toaster] {
+  font-family: inherit;
+
+  & [data-content] {
+    font-size: 0.8rem;
+  }
+  & [data-sonner-toast] {
+    &[data-type='success'] svg {
+      color: green;
+    }
+    &[data-type='error'] svg {
+      color: red;
+    }
+  }
+}
+
+kbd {
+  padding: 2px 4px;
+  font-size: 90%;
+  color: #333;
+  background-color: #fff;
+  border-radius: 3px;
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.25);
+}
+.modal-container {
+  border-radius: 10px !important;
+}
+
+body > main {
+  padding-inline: 0;
+}
+
+.modal-overlay {
+  z-index: 30 !important;
+}
+
+.tiptap.ProseMirror[id^='field-lessons'] {
+  min-height: 45rem !important;
+}
+input::placeholder {
+  font-size: large;
+}
