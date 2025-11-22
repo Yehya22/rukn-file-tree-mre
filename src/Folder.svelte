@@ -72,6 +72,7 @@
                         }}
                     >
                         <VirtualList
+                            bind:ref={virtual_list_element}
                             estimateSize={() => ITEM_HEIGHT}
                             overscan={0}
                             paddingStart={0}
@@ -210,7 +211,7 @@
 import {ar_nums, set_top_offset} from '~/util/intl.js'
 import * as kv from 'idb-keyval'
 import {watch} from 'runed'
-import {onDestroy} from 'svelte'
+import {tick, onDestroy} from 'svelte'
 import {SvelteSet} from 'svelte/reactivity'
 import {FileNode, FileTree, FolderNode, Tree, VirtualList} from 'svelte-file-tree'
 import {toast} from 'svelte-sonner'
@@ -243,6 +244,7 @@ let paste_operation = $state()
 let edit_state = $state()
 
 let tree = $state()
+let virtual_list_element = $state(null)
 let has_scrolled = $state(false)
 
 let context_menu_target = $state(undefined)
@@ -550,10 +552,7 @@ function ensure_children_loaded(folder_node_id) {
     if (total_children === 0) {
         node.children = []
         children_loaded_ids.add(folder_node_id)
-        return
-    }
-
-    if (total_children > LAZY_LOAD_THRESHOLD) {
+    } else if (total_children > LAZY_LOAD_THRESHOLD) {
         const initial = Math.min(
             total_children,
             Math.max(64, Math.min(APPEND_CHUNK_SIZE, total_children)),
@@ -572,6 +571,11 @@ function ensure_children_loaded(folder_node_id) {
         node.children = [...folder_nodes, ...file_nodes]
         children_loaded_ids.add(folder_node_id)
     }
+
+    tick().then(() => {
+        virtual_list_element?.scrollBy(0, +1)
+        virtual_list_element?.scrollBy(0, -1)
+    })
 }
 
 let file_rev_map = $state({})
