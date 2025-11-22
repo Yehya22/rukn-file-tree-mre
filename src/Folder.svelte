@@ -72,7 +72,7 @@
                         }}
                     >
                         <VirtualList
-                            bind:ref={virtual_list_element}
+                            bind:this={virtual_list}
                             estimateSize={() => ITEM_HEIGHT}
                             overscan={0}
                             paddingStart={0}
@@ -143,7 +143,7 @@
                                                 }}
                                                 {file_rev_map}
                                                 {users_map}
-                                                bind:selected_ids
+                                                {selected_ids}
                                                 on_copy={handle_copy}
                                                 on_cut={handle_cut}
                                                 on_paste={({item_id, node_type, shiftKey}) => {
@@ -236,15 +236,15 @@ const perms_app = get_perm('app')
 const perms_folder = get_perm('folder')
 const users_map = $appdata.users.map
 
-let expanded_ids = new SvelteSet()
-let selected_ids = new SvelteSet()
+const expanded_ids = new SvelteSet()
+const selected_ids = new SvelteSet()
 let clipboard_ids = new SvelteSet()
 let pending_delete_ids = new SvelteSet()
 let paste_operation = $state()
 let edit_state = $state()
 
 let tree = $state()
-let virtual_list_element = $state(null)
+let virtual_list = $state(null)
 let has_scrolled = $state(false)
 
 let context_menu_target = $state(undefined)
@@ -387,13 +387,16 @@ const folder_id = $derived.by(() => {
         const stored_expanded_ids = await kv.get(EXPANDED_IDS_KEY)
         if (Array.isArray(stored_expanded_ids)) {
             // Restore exactly what was saved previously
-            expanded_ids = new SvelteSet(stored_expanded_ids)
+            expanded_ids.clear()
+            for (const id of stored_expanded_ids){
+                expanded_ids.add(id)
+            }
             // Load children for restored expanded folders
             queueMicrotask(() => {
                 for (const id of stored_expanded_ids) ensure_children_loaded(id)
             })
         } else {
-            expanded_ids = new SvelteSet()
+            expanded_ids.clear()
         }
     } catch (error) {
         console.error('Failed to load expanded nodes from IndexedDB:', error)
@@ -552,7 +555,10 @@ function ensure_children_loaded(folder_node_id) {
     if (total_children === 0) {
         node.children = []
         children_loaded_ids.add(folder_node_id)
-    } else if (total_children > LAZY_LOAD_THRESHOLD) {
+        return
+    }
+
+    if (total_children > LAZY_LOAD_THRESHOLD) {
         const initial = Math.min(
             total_children,
             Math.max(64, Math.min(APPEND_CHUNK_SIZE, total_children)),
@@ -573,8 +579,7 @@ function ensure_children_loaded(folder_node_id) {
     }
 
     tick().then(() => {
-        virtual_list_element?.scrollBy(0, +1)
-        virtual_list_element?.scrollBy(0, -1)
+        virtual_list?.measure()
     })
 }
 
