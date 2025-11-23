@@ -10,7 +10,7 @@
         position: {sticky ? 'sticky' : 'absolute'};
         top: {sticky ? relative_depth * size : 0}px;
         transform: translateY({sticky ? 0 : start}px);
-        z-index: {sticky ? 50 - relative_depth : 'auto'};
+        z-index: {50 - relative_depth};
     "
     onclick={e => {
         const meta_key = navigator.platform.startsWith('Mac') ? e.metaKey : e.ctrlKey
@@ -412,7 +412,7 @@ let {
     file_rev_map,
     users_map,
     drag_and_drop,
-    selected_ids = $bindable(),
+    selected_ids,
     ensure_children_loaded = () => {},
     on_copy = () => {},
     on_cut = () => {},
