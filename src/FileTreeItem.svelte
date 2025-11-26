@@ -269,7 +269,7 @@
         <div
             class={[
                 'flex items-center',
-                sticky_indices.includes(order) ? 'relative h-full w-full' : 'col-span-3',
+                sticky ? 'relative h-full w-full' : 'col-span-3',
             ]}
             style="margin-inline-start: {item.depth * 1.25 + 0.25}rem;"
         >
@@ -350,7 +350,7 @@
                         ? full_path.slice(full_path.lastIndexOf(' / ') + 3)
                         : full_path}
                 <span class="ms-2 truncate text-black">
-                    {sticky_indices.indexOf(order) !== -1 && item.node.type === 'folder'
+                    {sticky && item.node.type === 'folder'
                         ? last_segment || item.node.name
                         : item.node.name}
                 </span>
@@ -363,7 +363,7 @@
             <span
                 class={[
                     'text-xs text-muted-foreground',
-                    sticky_indices.indexOf(order) !== -1 && 'absolute end-[6%]',
+                    sticky && 'absolute end-[6%]',
                 ]}>{prep_num(counts.total)}</span
             >
         {/if}
@@ -380,6 +380,7 @@ import {
 } from '@lucide/svelte'
 import {fmt_date} from '~/util/intl.js'
 import {watch} from 'runed'
+import {tick} from 'svelte'
 import {TreeItem} from 'svelte-file-tree'
 
 import {focus_and_select, prep_num} from '~/util/util.js'

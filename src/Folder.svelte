@@ -256,7 +256,7 @@ const children_loaded_ids = new Set()
 
 const EXPANDED_IDS_KEY = $derived(`${APP_NAME()}_expanded_ids`)
 const ITEM_HEIGHT = 40
-const VIRTUAL_LIST_PADDING = 12
+const VIRTUAL_LIST_PADDING = 0
 // Controls for incremental loading of large folders
 const LAZY_LOAD_THRESHOLD = 600
 const APPEND_CHUNK_SIZE = 256
@@ -281,7 +281,6 @@ const drag_and_drop = create_tree_drag_and_drop({
     on_drag_end: () => {
         drop_destination_node_id = null
     },
-    scroll_padding: VIRTUAL_LIST_PADDING,
 })
 
 const sticky_parents_state = new StickyParentsState({
