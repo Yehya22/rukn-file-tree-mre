@@ -72,19 +72,18 @@ export class StickyParentsState {
     /**
      * @param {Object} props
      * @param {() => import('svelte-file-tree').Tree<any, any>} props.get_tree
-     * @param {() => any} [props.get_opened_item]
      * @param {number} props.item_height
      * @param {number} props.scroll_padding
      */
-    constructor({get_tree, get_opened_item = () => null, item_height, scroll_padding}) {
+    constructor({get_tree, item_height, scroll_padding}) {
         this.#get_tree = get_tree
         this.#item_height = item_height
         this.#scroll_padding = scroll_padding
 
         watch(
-            get_opened_item,
+            () => this.#get_tree()?.getVisibleItems(),
             () => {
-                this.#sticky_indices = []
+                tick().then(this.#update)
             },
             {lazy: true},
         )

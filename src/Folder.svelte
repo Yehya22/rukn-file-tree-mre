@@ -72,15 +72,14 @@
                         }}
                     >
                         <VirtualList
-                            bind:this={virtual_list}
                             estimateSize={() => ITEM_HEIGHT}
                             overscan={0}
-                            paddingStart={0}
-                            paddingEnd={0}
-                            rangeExtractor={virtual_list_range_extractor}
+                            paddingStart={VIRTUAL_LIST_PADDING}
+                            paddingEnd={VIRTUAL_LIST_PADDING}
+                            rangeExtractor={sticky_parents_state.range_extractor}
                             class="overflow-y-auto"
                             style="height: calc(100vh - var(--top-offset, 60px)); min-height: 400px; margin-left: calc(50% - 50vw); margin-right: calc(50% - 50vw);"
-                            {@attach virtual_list_attach}
+                            {@attach sticky_parents_state.virtual_list_attachment}
                         >
                             {#snippet children({treeSize, virtualItems})}
                                 <div class="mx-auto max-w-2xl px-0.5">
@@ -95,7 +94,7 @@
                                         canRemove={can_remove}
                                         onRemove={on_tree_remove}
                                         isItemDisabled={() => perms_folder < ACCESS_LEVELS.EDITOR}
-                                        isItemHidden={node => pending_delete_ids.has(node.id)}
+                                        isItemHidden={is_item_hidden}
                                         ondragover={drag_and_drop.tree.ondragover}
                                         ondragleave={drag_and_drop.tree.ondragleave}
                                         ondrop={drag_and_drop.tree.ondrop}
@@ -116,7 +115,7 @@
                                                 {size}
                                                 {start}
                                                 {tree}
-                                                {has_scrolled}
+                                                {opened_folder}
                                                 app_name={APP_NAME()}
                                                 expandedIds={expanded_ids}
                                                 bind:edit_state
@@ -124,7 +123,6 @@
                                                 {border_animation_target_id}
                                                 sticky_indices={sticky_parents_state.sticky_indices}
                                                 deepest_visible_sticky_id={sticky_parents_state.deepest_visible_sticky_id}
-                                                {folder_full_paths}
                                                 {drag_and_drop}
                                                 on_context_menu={target =>
                                                     (context_menu_target = target)}
@@ -132,15 +130,6 @@
                                                 {handle_edit_item}
                                                 {handle_new_file}
                                                 {handle_new_folder}
-                                                {ensure_children_loaded}
-                                                persist_expanded={() => {
-                                                    try {
-                                                        kv.set(
-                                                            EXPANDED_IDS_KEY,
-                                                            Array.from(expanded_ids),
-                                                        )
-                                                    } catch {}
-                                                }}
                                                 {file_rev_map}
                                                 {users_map}
                                                 {selected_ids}
@@ -211,9 +200,9 @@
 import {ar_nums, set_top_offset} from '~/util/intl.js'
 import * as kv from 'idb-keyval'
 import {watch} from 'runed'
-import {tick, onDestroy} from 'svelte'
+import {onDestroy} from 'svelte'
 import {SvelteSet} from 'svelte/reactivity'
-import {FileNode, FileTree, FolderNode, Tree, VirtualList} from 'svelte-file-tree'
+import {FileNode as BaseFileNode, FileTree, FolderNode as BaseFolderNode, Tree, VirtualList} from 'svelte-file-tree'
 import {toast} from 'svelte-sonner'
 
 import api from '~/api.js'
@@ -238,28 +227,22 @@ const users_map = $appdata.users.map
 
 const expanded_ids = new SvelteSet()
 const selected_ids = new SvelteSet()
-let clipboard_ids = new SvelteSet()
-let pending_delete_ids = new SvelteSet()
+const clipboard_ids = new SvelteSet()
+const pending_delete_ids = new SvelteSet()
 let paste_operation = $state()
 let edit_state = $state()
 
 let tree = $state()
-let virtual_list = $state(null)
-let has_scrolled = $state(false)
 
 let context_menu_target = $state(undefined)
 let drop_destination_node_id = $state(null)
 let border_animation_target_id = $state(null)
 let border_animation_timeout = $state(null)
-// Track loaded folders to avoid repeated loads
-const children_loaded_ids = new Set()
 
 const EXPANDED_IDS_KEY = $derived(`${APP_NAME()}_expanded_ids`)
 const ITEM_HEIGHT = 40
-const VIRTUAL_LIST_PADDING = 12
-// Controls for incremental loading of large folders
-const LAZY_LOAD_THRESHOLD = 600
-const APPEND_CHUNK_SIZE = 256
+const VIRTUAL_LIST_PADDING = 0
+const ROOT_FOLDER_ID = 1
 
 const drag_and_drop = create_tree_drag_and_drop({
     get_tree: () => tree,
@@ -281,85 +264,107 @@ const drag_and_drop = create_tree_drag_and_drop({
     on_drag_end: () => {
         drop_destination_node_id = null
     },
-    scroll_padding: VIRTUAL_LIST_PADDING,
 })
 
 const sticky_parents_state = new StickyParentsState({
     get_tree: () => tree,
+    get_folder_id: () => folder_id,
     item_height: ITEM_HEIGHT,
     scroll_padding: VIRTUAL_LIST_PADDING,
 })
 
-function virtual_list_range_extractor({startIndex, endIndex, overscan, count}) {
-    has_scrolled = startIndex > 0
-    maybe_append_more(endIndex, count)
-    return sticky_parents_state.range_extractor({startIndex, endIndex, overscan, count})
-}
-
-function virtual_list_attach(element) {
-    return sticky_parents_state.virtual_list_attachment(element)
-}
-
-// Lazy append state for large folders (no visible page nodes)
-const lazy_children_state = new Map()
-const append_inflight_ids = new Set()
-
-let file_tree = new FileTree([])
-// Match previous behavior: clear lazy caches when dataset/folder changes
+// Persist expanded ids to idb
 watch(
-    [() => $appdata, () => folder_id, () => $show_system_files],
-    () => {
-        children_loaded_ids.clear()
-        lazy_children_state.clear()
-        append_inflight_ids.clear()
-        const ids = Array.from(expanded_ids)
-        queueMicrotask(() => {
-            for (const id of ids) ensure_children_loaded(id)
-        })
+    () => Array.from(expanded_ids),
+    ids => {
+        try {
+            kv.set(EXPANDED_IDS_KEY, ids)
+        } catch (error) {
+            console.error('Failed to save expanded ids to idb:', error)
+        }
     },
     {lazy: true},
 )
 
-// Update the persistent FileTree's children when data or folder changes
-watch(
-    [
-        () => $appdata.files.list,
-        () => $appdata.folders.list,
-        () => folder_id,
-        () => $show_system_files,
-    ],
-    () => {
-        folder_full_paths.clear()
-        const files = $appdata.files.list
-        const folders = $appdata.folders.list
-        tree_indexes = build_indexes(files, folders)
-        const parent_path = ''
-        file_tree.children = initial_children_for_folder(folder_id, parent_path)
-    },
-)
-
-function maybe_append_more(endIndex, count) {
-    try {
-        if (!tree) return
-        if (!count) return
-        // Only react when scrolled near the end of the current virtual range
-        if (endIndex < count - 10) return
-        for (const [key, state] of lazy_children_state.entries()) {
-            if (state.loaded >= state.total) continue
-            if (append_inflight_ids.has(key)) continue
-            const item = tree.getItem?.(key)
-            if (!item) continue
-            append_inflight_ids.add(key)
-            const next = Math.min(state.loaded + APPEND_CHUNK_SIZE, state.total)
-            const nodes = slice_children_range(state.folderId, state.loaded, next, state.parentPath)
-            item.node.children = item.node.children.concat(nodes)
-            state.loaded = next
-            append_inflight_ids.delete(key)
-        }
-    } catch {
-        console.error('Error in maybe_append_more', {endIndex, count})
-    }
+function get_full_path(parent_path, name) {
+    return parent_path ? `${parent_path} / ${name}` : name
 }
+
+class FileNode extends BaseFileNode {
+    constructor({id, name, metadata, parent_path}) {
+        super({id, name})
+        this.metadata = $state(metadata)
+        this.parent_path = $state(parent_path)
+    }
+
+    full_path = $derived(get_full_path(this.parent_path, this.name))
+}
+
+class FolderNode extends BaseFolderNode {
+    constructor({id, name, metadata, parent_path, children}) {
+        super({id, name, children})
+        this.metadata = $state(metadata)
+        this.parent_path = $state(parent_path)
+    }
+
+    full_path = $derived(get_full_path(this.parent_path, this.name))
+}
+
+const file_tree = $derived.by(() => {
+    const all_files = $appdata.files.list
+    const all_folders = $appdata.folders.list
+
+    const files_by_folder = new Map()
+    const folders_by_parent = new Map()
+
+    for (const file of all_files) {
+        if (!file) continue
+
+        const key = file.folder
+        if (!key) continue
+
+        const arr = files_by_folder.get(key)
+        if (arr) arr.push(file)
+        else files_by_folder.set(key, [file])
+    }
+
+    for (const folder of all_folders) {
+        if (!folder) continue
+
+        const key = folder.parent
+        if (!key) continue
+
+        const arr = folders_by_parent.get(key)
+        if (arr) arr.push(folder)
+        else folders_by_parent.set(key, [folder])
+    }
+
+    function get_children_for_folder(folder_id, parent_path) {
+        const folder_nodes = folders_by_parent.get(folder_id)?.map(folder => {
+            const full_path = get_full_path(parent_path, folder.name)
+            return new FolderNode({
+                id: `folder-${folder.id}`,
+                name: folder.name,
+                metadata: folder.metadata,
+                parent_path,
+                children: get_children_for_folder(folder.id, full_path),
+            })
+        }) ?? []
+
+        const file_nodes = files_by_folder.get(folder_id)?.map(
+            file => new FileNode({
+                id: `file-${file.id}`,
+                name: file.name,
+                metadata: file.metadata,
+                parent_path,
+            }),
+        ) ?? []
+
+        return [...folder_nodes, ...file_nodes]
+    }
+
+    return new FileTree(get_children_for_folder(ROOT_FOLDER_ID, ''))
+})
 
 // Robustly resolve current folder id from route path. Handles both folder and file routes.
 const folder_id = $derived.by(() => {
@@ -382,6 +387,21 @@ const folder_id = $derived.by(() => {
     }
 })
 
+const opened_folder = $derived(tree?.getItem('folder-' + folder_id))
+
+function is_item_hidden(node) {
+    if (opened_folder && !node.full_path.startsWith(opened_folder.node.full_path)) {
+        return true
+    }
+    if (pending_delete_ids.has(node.id)) {
+        return true
+    }
+    if (node.metadata?.system && (perms_app < ACCESS_LEVELS.EDITOR || !$show_system_files)) {
+        return true
+    }
+    return false
+}
+
 ;(async () => {
     try {
         const stored_expanded_ids = await kv.get(EXPANDED_IDS_KEY)
@@ -391,10 +411,6 @@ const folder_id = $derived.by(() => {
             for (const id of stored_expanded_ids){
                 expanded_ids.add(id)
             }
-            // Load children for restored expanded folders
-            queueMicrotask(() => {
-                for (const id of stored_expanded_ids) ensure_children_loaded(id)
-            })
         } else {
             expanded_ids.clear()
         }
@@ -424,163 +440,6 @@ function start_border_animation(target_id) {
         border_animation_target_id = null
         border_animation_timeout = null
     }, 1000)
-}
-
-const is_editor = perms_app >= ACCESS_LEVELS.EDITOR
-
-const folder_full_paths = new Map()
-const file_nodes_cache = new Map()
-const folder_nodes_cache = new Map()
-
-// Build adjacency indexes in O(N) to avoid repeated filters on large datasets
-function build_indexes(all_files, all_folders) {
-    const files_by_folder = new Map()
-    const folders_by_parent = new Map()
-
-    const hide_system_for_user = !is_editor || !$show_system_files
-    // Index files, excluding system files when needed
-    for (const file of all_files) {
-        if (!file) continue
-        if (file.metadata?.system && hide_system_for_user) continue
-        const key = file.folder ?? null
-        const arr = files_by_folder.get(key)
-        if (arr) arr.push(file)
-        else files_by_folder.set(key, [file])
-    }
-
-    // Index folders by parent, excluding system folders when needed
-    for (const folder of all_folders) {
-        if (!folder) continue
-        if (folder.metadata?.system && hide_system_for_user) continue
-        const key = folder.parent ?? null
-        const arr = folders_by_parent.get(key)
-        if (arr) arr.push(folder)
-        else folders_by_parent.set(key, [folder])
-    }
-
-    return {files_by_folder, folders_by_parent}
-}
-
-function make_folder_node(folder, parent_path = '') {
-    const id = `folder-${folder.id}`
-    const full_path = parent_path ? `${parent_path} / ${folder.name}` : folder.name
-    folder_full_paths.set(id, full_path)
-    let node = folder_nodes_cache.get(id)
-    if (!node) {
-        node = new FolderNode({id, name: folder.name, children: []})
-        folder_nodes_cache.set(id, node)
-    } else {
-        node.name = folder.name
-    }
-    return node
-}
-
-function get_file_node(file) {
-    const id = `file-${file.id}`
-    let node = file_nodes_cache.get(id)
-    if (!node) {
-        node = new FileNode({id, name: file.name})
-        file_nodes_cache.set(id, node)
-    } else {
-        node.name = file.name
-    }
-    return node
-}
-
-// Non-reactive cache for adjacency indexes; do not declare with $state
-let tree_indexes = {files_by_folder: new Map(), folders_by_parent: new Map()}
-
-function initial_children_for_folder(current_folder_id, parent_path = '') {
-    const {files_by_folder, folders_by_parent} = tree_indexes
-
-    // For root folder (id=1), include children whose parent is 1 or null, mirroring previous logic
-    const direct_children = folders_by_parent.get(+current_folder_id) || []
-    const root_extras =
-        current_folder_id === 1
-            ? [...(folders_by_parent.get(null) || []), ...(folders_by_parent.get(0) || [])]
-            : []
-    const child_folders = [...direct_children, ...root_extras].filter(
-        f => f && f.id !== current_folder_id,
-    )
-
-    const sub_folders_nodes = child_folders.map(folder => make_folder_node(folder, parent_path))
-
-    const files = files_by_folder.get(current_folder_id) || []
-    const file_nodes = files.map(get_file_node)
-
-    return [...sub_folders_nodes, ...file_nodes]
-}
-
-function slice_children_range(folder_id, start_index, end_index, parent_path = '') {
-    const {files_by_folder, folders_by_parent} = tree_indexes
-    const child_folders = folders_by_parent.get(folder_id) || []
-    const files_in_folder = files_by_folder.get(folder_id) || []
-    const total_count = child_folders.length + files_in_folder.length
-    const clamped_start = Math.max(0, Math.min(start_index, total_count))
-    const clamped_end = Math.max(clamped_start, Math.min(end_index, total_count))
-    const result = []
-    const folder_count = child_folders.length
-    if (clamped_start < folder_count) {
-        const folders_start = clamped_start
-        const folders_end = Math.min(clamped_end, folder_count)
-        for (let i = folders_start; i < folders_end; i++) {
-            result.push(make_folder_node(child_folders[i], parent_path))
-        }
-    }
-    if (clamped_end > folder_count) {
-        const files_start = Math.max(0, clamped_start - folder_count)
-        const files_end = clamped_end - folder_count
-        for (let j = files_start; j < files_end && j < files_in_folder.length; j++) {
-            const file = files_in_folder[j]
-            result.push(get_file_node(file))
-        }
-    }
-    return result
-}
-
-function ensure_children_loaded(folder_node_id) {
-    if (!folder_node_id?.startsWith('folder-')) return
-
-    const id_num = +folder_node_id.substring('folder-'.length)
-    if (children_loaded_ids.has(folder_node_id)) return
-    const node = folder_nodes_cache.get(folder_node_id)
-    if (!node || node.type !== 'folder') return
-
-    const parent_path = folder_full_paths.get(folder_node_id) || ''
-    const {files_by_folder, folders_by_parent} = tree_indexes
-    const child_folders = folders_by_parent.get(id_num) || []
-    const files = files_by_folder.get(id_num) || []
-    const total_children = child_folders.length + files.length
-
-    if (total_children === 0) {
-        node.children = []
-        children_loaded_ids.add(folder_node_id)
-        return
-    }
-
-    if (total_children > LAZY_LOAD_THRESHOLD) {
-        const initial = Math.min(
-            total_children,
-            Math.max(64, Math.min(APPEND_CHUNK_SIZE, total_children)),
-        )
-        node.children = slice_children_range(id_num, 0, initial, parent_path)
-        lazy_children_state.set(folder_node_id, {
-            folderId: id_num,
-            total: total_children,
-            loaded: initial,
-            parentPath: parent_path,
-        })
-        children_loaded_ids.add(folder_node_id)
-    } else {
-        const folder_nodes = child_folders.map(folder => make_folder_node(folder, parent_path))
-        const file_nodes = files.map(get_file_node)
-        node.children = [...folder_nodes, ...file_nodes]
-        children_loaded_ids.add(folder_node_id)
-    }
-
-    tick().then(() => {
-        virtual_list?.measure()
-    })
 }
 
 let file_rev_map = $state({})
