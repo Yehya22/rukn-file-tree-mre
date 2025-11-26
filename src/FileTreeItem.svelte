@@ -134,11 +134,9 @@
             } else if (item.node.type === 'folder') {
                 if (expandedIds.has(item.node.id)) {
                     expandedIds.delete(item.node.id)
-                    persist_expanded?.()
                 } else {
                     ensure_children_loaded?.(item.node.id)
                     expandedIds.add(item.node.id)
-                    persist_expanded?.()
                 }
             }
         } else if (meta_key || e.ctrlKey) {
@@ -288,12 +286,10 @@
                     e.currentTarget.focus()
                     if (expandedIds.has(item.node.id)) {
                         expandedIds.delete(item.node.id)
-                        persist_expanded?.()
                     } else {
                         // Lazy-load children on expand
                         ensure_children_loaded?.(item.node.id)
                         expandedIds.add(item.node.id)
-                        persist_expanded?.()
                         // Bring first child into view so expansion is visible, but only if there are children
                         queueMicrotask(() => {
                             try {
@@ -422,7 +418,6 @@ let {
     on_delete = () => {},
     can_replace,
     on_replace,
-    persist_expanded = () => {},
 } = $props()
 
 const sticky = $derived(sticky_indices.includes(order))

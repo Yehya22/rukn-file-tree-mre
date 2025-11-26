@@ -133,14 +133,6 @@
                                                 {handle_new_file}
                                                 {handle_new_folder}
                                                 {ensure_children_loaded}
-                                                persist_expanded={() => {
-                                                    try {
-                                                        kv.set(
-                                                            EXPANDED_IDS_KEY,
-                                                            Array.from(expanded_ids),
-                                                        )
-                                                    } catch {}
-                                                }}
                                                 {file_rev_map}
                                                 {users_map}
                                                 {selected_ids}
@@ -335,6 +327,19 @@ watch(
         const parent_path = ''
         file_tree.children = initial_children_for_folder(folder_id, parent_path)
     },
+)
+
+// Persist expanded ids to idb
+watch(
+    () => Array.from(expanded_ids),
+    ids => {
+        try {
+            kv.set(EXPANDED_IDS_KEY, ids)
+        } catch (error) {
+            console.error('Failed to save expanded ids to idb:', error)
+        }
+    },
+    {lazy: true},
 )
 
 function maybe_append_more(endIndex, count) {
