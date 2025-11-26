@@ -135,7 +135,6 @@
                 if (expandedIds.has(item.node.id)) {
                     expandedIds.delete(item.node.id)
                 } else {
-                    ensure_children_loaded?.(item.node.id)
                     expandedIds.add(item.node.id)
                 }
             }
@@ -280,18 +279,20 @@
                     'flex h-6 w-6 shrink-0 items-center justify-center transition-transform duration-150 ease-in-out hover:bg-transparent focus:bg-transparent ltr:-rotate-180',
                     item.expanded && '-rotate-90!',
                 ]}
-                onclick={e => {
+                onclick={async e => {
                     e.preventDefault()
                     e.stopPropagation()
                     e.currentTarget.focus()
                     if (expandedIds.has(item.node.id)) {
+                        if (sticky) {
+                            e.currentTarget.closest('[role="treeitem"]').focus()
+                            await tick()
+                        }
                         expandedIds.delete(item.node.id)
                     } else {
-                        // Lazy-load children on expand
-                        ensure_children_loaded?.(item.node.id)
                         expandedIds.add(item.node.id)
                         // Bring first child into view so expansion is visible, but only if there are children
-                        queueMicrotask(() => {
+                        tick().then(() => {
                             try {
                                 if (item.node.children && item.node.children.length) {
                                     tree?.focusItem?.(order + 1)
@@ -340,7 +341,7 @@
                     use:focus_and_select
                 />
             {:else}
-                {@const full_path = folder_full_paths?.get(item.node.id)}
+                {@const full_path = item.node.full_path}
                 {@const last_segment =
                     full_path && full_path.includes(' / ')
                         ? full_path.slice(full_path.lastIndexOf(' / ') + 3)
@@ -375,7 +376,6 @@ import {
     FolderOpenIcon,
 } from '@lucide/svelte'
 import {fmt_date} from '~/util/intl.js'
-import {watch} from 'runed'
 import {tick} from 'svelte'
 import {TreeItem} from 'svelte-file-tree'
 
@@ -392,6 +392,7 @@ let {
     size,
     start,
     tree,
+    opened_folder,
     app_name,
     expandedIds,
     edit_state = $bindable(),
@@ -399,7 +400,6 @@ let {
     border_animation_target_id,
     deepest_visible_sticky_id,
     sticky_indices = [],
-    folder_full_paths,
     confirm_inline_edit,
     on_context_menu,
     handle_edit_item,
@@ -410,7 +410,6 @@ let {
     users_map,
     drag_and_drop,
     selected_ids,
-    ensure_children_loaded = () => {},
     on_copy = () => {},
     on_cut = () => {},
     on_paste = () => {},
@@ -421,24 +420,13 @@ let {
 } = $props()
 
 const sticky = $derived(sticky_indices.includes(order))
-const relative_depth = $derived(item.depth)
+const relative_depth = $derived(item.depth - (opened_folder?.depth ?? 0))
 
 const original_file_id_str =
     item.node.type === 'file' ? item.node.id.substring('file-'.length) : null
 const original_file_id = original_file_id_str ? +original_file_id_str : null
 // Use O(1) lookup against the map instead of O(N) find per item render
 const file_detail = original_file_id ? $appdata.files.map[original_file_id] : null
-
-// Ensure children are loaded whenever a folder becomes expanded,
-watch(
-    () => [item.node.type, item.expanded, item.node.id],
-    ([type, expanded, id]) => {
-        if (type === 'folder' && expanded) {
-            ensure_children_loaded?.(id)
-        }
-    },
-    {lazy: true},
-)
 
 function build_file_url(folder_id, file_id) {
     const path_arr = [app_name, ...get_folder_parents(folder_id), 'edit', file_id]
